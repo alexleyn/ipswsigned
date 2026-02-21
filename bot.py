@@ -141,16 +141,59 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ─────────────────────────── /list ──────────────────────────────
 
+def _mysubs_keyboard(subs: list) -> InlineKeyboardMarkup:
+    rows = []
+    for s in subs:
+        rows.append([
+            InlineKeyboardButton(
+                f"📱 {s['device_name']}",
+                callback_data=f"sub_view:{s['device_identifier']}",
+            ),
+            InlineKeyboardButton("❌", callback_data=f"sub_del:{s['device_identifier']}"),
+        ])
+    return InlineKeyboardMarkup(rows)
+
+
 async def cmd_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     subs = db.get_user_subscriptions(update.effective_user.id)
     if not subs:
-        await update.message.reply_text("You have no active subscriptions.")
+        await update.message.reply_text(
+            "You have no active subscriptions.\n\nUse /start to find a device and subscribe."
+        )
         return
 
-    lines = ["<b>Your subscriptions:</b>\n"]
-    for s in subs:
-        lines.append(f"• {escape(s['device_name'])} <code>({escape(s['device_identifier'])})</code>")
-    await update.message.reply_text("\n".join(lines), parse_mode="HTML")
+    await update.message.reply_text(
+        f"<b>Your subscriptions ({len(subs)}):</b>\n\n"
+        "Tap a device to check its current signing status.\n"
+        "Tap ❌ to remove a subscription.",
+        reply_markup=_mysubs_keyboard(subs),
+        parse_mode="HTML",
+    )
+
+
+async def cb_sub_view(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    identifier = query.data.split(":", 1)[1]
+    await _show_device(query, identifier, query.from_user.id)
+
+
+async def cb_sub_del(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    identifier = query.data.split(":", 1)[1]
+    user_id = query.from_user.id
+    db.remove_subscription(user_id, identifier)
+
+    subs = db.get_user_subscriptions(user_id)
+    if not subs:
+        await query.edit_message_text(
+            "You have no active subscriptions.\n\nUse /start to find a device and subscribe."
+        )
+        return
+
+    await query.edit_message_reply_markup(reply_markup=_mysubs_keyboard(subs))
 
 
 # ─────────────────────────── /check ─────────────────────────────
@@ -334,6 +377,8 @@ def main():
         entry_points=[
             CommandHandler("start", cmd_start),
             CommandHandler("check", cmd_check),
+            # Allows "Main menu" to restart the conversation from anywhere
+            CallbackQueryHandler(cb_main_menu, pattern=r"^main$"),
         ],
         states={
             CHOOSING_TYPE: [
@@ -359,9 +404,11 @@ def main():
     app.add_handler(CommandHandler("list", cmd_list))
 
     # Inline button handlers (outside conversation)
-    app.add_handler(CallbackQueryHandler(cb_follow,   pattern=r"^follow:"))
-    app.add_handler(CallbackQueryHandler(cb_unfollow, pattern=r"^unfollow:"))
-    app.add_handler(CallbackQueryHandler(cb_refresh,  pattern=r"^refresh:"))
+    app.add_handler(CallbackQueryHandler(cb_follow,    pattern=r"^follow:"))
+    app.add_handler(CallbackQueryHandler(cb_unfollow,  pattern=r"^unfollow:"))
+    app.add_handler(CallbackQueryHandler(cb_refresh,   pattern=r"^refresh:"))
+    app.add_handler(CallbackQueryHandler(cb_sub_view,  pattern=r"^sub_view:"))
+    app.add_handler(CallbackQueryHandler(cb_sub_del,   pattern=r"^sub_del:"))
 
     # Background job
     app.job_queue.run_repeating(
