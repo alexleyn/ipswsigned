@@ -1,6 +1,6 @@
 # IPSW Signing Monitor Bot
 
-A Telegram bot that monitors Apple firmware signing status on [ipsw.me](https://ipsw.me) and [ipsw.dev](https://ipsw.dev) and notifies you of any changes.
+A Telegram bot that monitors Apple firmware signing status on [ipsw.me](https://ipsw.me) and [ipsw.dev](https://ipsw.dev) and notifies you of any changes. Bot was deployed and available as [@ipswsignedbot](https://t.me/ipswsignedbot).
 
 ## How it works
 
