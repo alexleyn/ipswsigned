@@ -89,6 +89,10 @@ async def check_device(app, identifier: str, device_name: str):
             _, all_fw = await api.get_dev_firmwares(identifier)
 
         if not all_fw:
+            logger.warning(
+                "Empty firmware list for %s (%s) — upstream HTML/API may have changed",
+                identifier, source,
+            )
             continue
 
         old_snapshot = db.get_snapshot(identifier, source)

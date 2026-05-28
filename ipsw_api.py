@@ -184,7 +184,7 @@ def _parse_ipsw_dev(html: str, identifier: str) -> tuple[list, list]:
     Each <tr class="firmware"> has:
       - data-signed="true"/"false"
       - onclick="window.location = '/download/{id}/{buildid}';"
-      - <strong>{version}</strong>
+      - version inside .versions-info .font-semibold (older markup used <strong>)
     """
     soup = BeautifulSoup(html, "html.parser")
     results = []
@@ -197,9 +197,13 @@ def _parse_ipsw_dev(html: str, identifier: str) -> tuple[list, list]:
         onclick = row.get("onclick", "")
         m = build_re.search(onclick)
         buildid = m.group(1) if m else ""
+        if not buildid:
+            build_el = row.select_one(".build-id")
+            if build_el:
+                buildid = build_el.get_text(strip=True)
 
-        strong = row.find("strong")
-        version = strong.get_text(strip=True) if strong else ""
+        version_el = row.select_one(".versions-info .font-semibold") or row.find("strong")
+        version = version_el.get_text(strip=True) if version_el else ""
 
         if not version:
             continue
